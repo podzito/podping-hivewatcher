@@ -7,6 +7,7 @@
 #
 # Version 1.1
 
+from threading import Thread
 import time
 import json
 import argparse
@@ -51,12 +52,6 @@ def block_num_back_in_minutes(blockchain: Blockchain, m: int) -> int:
     back_time = datetime.utcnow() - timedelta(minutes=m)
     block_num = blockchain.get_estimated_block_num(back_time)
     return block_num
-
-
-def publish(client, args, urls):
-    response = client.publish(args.topic, json.dumps(urls))
-    if response != mqtt.MQTT_ERR_SUCCESS:
-        raise Exception(f"Error publishing message: {response}")
     
 def start(client, args):
     """Outputs URLs as they appear on the Hive Podping stream"""
@@ -88,28 +83,35 @@ def start(client, args):
                     publish(client, args, data.get("iris"))
                 elif data.get("url"):
                     publish(client, args, [data.get("url")])
-    
+   
+def publish(client: mqtt.Client, args, urls):
+    response = client.publish(args.topic, json.dumps(urls), 1)
+    if response.rc != mqtt.MQTT_ERR_SUCCESS:
+        raise Exception(f"Error publishing message: {response}")
+        
 def main():
     parser = argparse.ArgumentParser(description='Publish hive messages')
     parser.add_argument('--address', default="127.0.0.1", help='MQTT address')
     parser.add_argument('--port', default=1883, help='MQTT port')
     parser.add_argument('--topic', required=True, help='topic name')
+    parser.add_argument('--username', help='username')
+    parser.add_argument('--password', help='password')
     args = parser.parse_args()
     
     def on_connect(client, userdata, flags, reason_code, properties):
-        print(f"Connected with result code {reason_code}")
-        start(client, args)
+        thread = Thread(target = start, args = (client, args))
+        thread.start()
         
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.on_connect = on_connect 
-    client.connect(args.address, args.port)
-    client.loop_start()
+    client.username_pw_set(args.username, args.password)
     
+    client.on_connect = on_connect 
+    client.connect(args.address, args.port)    
+    client.loop_forever()
+
 if __name__ == "__main__":
     try:
-        main()
-        while True:
-            time.sleep(1)            
+        client = main()
     except KeyboardInterrupt:
         logging.info("Terminated with Ctrl-C")
         sys.exit(1)
