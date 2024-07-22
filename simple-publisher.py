@@ -78,14 +78,15 @@ def start(client, args):
             if set(post["required_posting_auths"]) & allowed_accounts:
                 data = json.loads(post.get("json"))
                 if data.get("iris"):
-                    publish(client, args, data.get("iris"))
+                    publish(client, args, [], data.get("iris"))
                 elif data.get("urls"):
-                    publish(client, args, data.get("iris"))
+                    publish(client, args, data.get("urls"), [])
                 elif data.get("url"):
-                    publish(client, args, [data.get("url")])
+                    publish(client, args, [data.get("url")], [])
    
-def publish(client: mqtt.Client, args, urls):
-    response = client.publish(args.topic, json.dumps(urls), 1)
+def publish(client: mqtt.Client, args, urls, iris):
+    print(f"Publishing {urls} {iris}")
+    response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1)
     if response.rc != mqtt.MQTT_ERR_SUCCESS:
         raise Exception(f"Error publishing message: {response}")
         
