@@ -86,7 +86,7 @@ def start(client, args):
    
 def publish(client: mqtt.Client, args, urls, iris):
     print(f"Publishing {urls} {iris}")
-    response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1)
+    response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1, retain=True)
     if response.rc != mqtt.MQTT_ERR_SUCCESS:
         raise Exception(f"Error publishing message: {response}")
         
