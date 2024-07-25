@@ -54,36 +54,40 @@ def block_num_back_in_minutes(blockchain: Blockchain, m: int) -> int:
     return block_num
     
 def start(client, args):
-    """Outputs URLs as they appear on the Hive Podping stream"""
-    allowed_accounts = get_allowed_accounts()
-    hive = beem.Hive()
-    blockchain = Blockchain(mode="head", blockchain_instance=hive)
+    try:
+        """Outputs URLs as they appear on the Hive Podping stream"""
+        allowed_accounts = get_allowed_accounts()
+        hive = beem.Hive()
+        blockchain = Blockchain(mode="head", blockchain_instance=hive)
 
-    # Look back 15 minutes
-    start_block = block_num_back_in_minutes(blockchain, 15)
+        # Look back 15 minutes
+        start_block = block_num_back_in_minutes(blockchain, 15)
 
-    # If you want instant confirmation, you need to instantiate
-    # class:beem.blockchain.Blockchain with mode="head",
-    # otherwise, the call will wait until confirmed in an irreversible block.
-    # noinspection PyTypeChecker
-    # Filter only for "custom_json" operations on Hive.
-    stream = blockchain.stream(
-        opNames=["custom_json"], raw_ops=False, threading=False, start=start_block
-    )
+        # If you want instant confirmation, you need to instantiate
+        # class:beem.blockchain.Blockchain with mode="head",
+        # otherwise, the call will wait until confirmed in an irreversible block.
+        # noinspection PyTypeChecker
+        # Filter only for "custom_json" operations on Hive.
+        stream = blockchain.stream(
+            opNames=["custom_json"], raw_ops=False, threading=False, start=start_block
+        )
 
-    for post in stream:
-        # Filter only on post ID from the list above.
-        if allowed_op_id(post["id"]):
-            # Filter by the accounts we have authorised to podping
-            if set(post["required_posting_auths"]) & allowed_accounts:
-                data = json.loads(post.get("json"))
-                if data.get("iris"):
-                    publish(client, args, [], data.get("iris"))
-                elif data.get("urls"):
-                    publish(client, args, data.get("urls"), [])
-                elif data.get("url"):
-                    publish(client, args, [data.get("url")], [])
-   
+        for post in stream:
+            # Filter only on post ID from the list above.
+            if allowed_op_id(post["id"]):
+                # Filter by the accounts we have authorised to podping
+                if set(post["required_posting_auths"]) & allowed_accounts:
+                    data = json.loads(post.get("json"))
+                    if data.get("iris"):
+                        publish(client, args, [], data.get("iris"))
+                    elif data.get("urls"):
+                        publish(client, args, data.get("urls"), [])
+                    elif data.get("url"):
+                        publish(client, args, [data.get("url")], [])
+    except Exception as ex:
+            logging.error(f"Error: {ex}", exc_info=True)
+            sys.exit(1)
+            
 def publish(client: mqtt.Client, args, urls, iris):
     print(f"Publishing {urls} {iris}")
     response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1, retain=True)
