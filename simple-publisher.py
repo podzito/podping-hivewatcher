@@ -106,6 +106,8 @@ def monitor():
         if time_last_message > 300:
             print(f"No messages for {time_last_message} seconds. Exiting.")
             sys.exit(1)
+        else:
+            print(f"Last message was {time_last_message} seconds ago.")
           
 def main():
     parser = argparse.ArgumentParser(description='Publish hive messages')
