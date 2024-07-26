@@ -26,6 +26,7 @@ from beem.blockchain import Blockchain
 WATCHED_OPERATION_IDS = ["podping", "pp_"]
 LIVETEST_WATCHED_OPERATION_IDS = ["podping-livetest", "pplt_"]
 
+last_message_time = 0
 
 def get_allowed_accounts(acc_name="podping") -> Set[str]:
     """get a list of all accounts allowed to post by acc_name (podping)
@@ -89,11 +90,23 @@ def start(client, args):
             sys.exit(1)
             
 def publish(client: mqtt.Client, args, urls, iris):
+    global last_message_time
+    
     print(f"Publishing {urls} {iris}")
+    last_message_time = time.time()    
     response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1, retain=True)
     if response.rc != mqtt.MQTT_ERR_SUCCESS:
         raise Exception(f"Error publishing message: {response}")
-        
+
+def monitor():
+    while True:
+        global last_message_time
+        time.sleep(5)      
+        time_last_message = (time.time() - last_message_time)
+        if time_last_message > 300:
+            print(f"No messages for {time_last_message} seconds. Exiting.")
+            sys.exit(1)
+          
 def main():
     parser = argparse.ArgumentParser(description='Publish hive messages')
     parser.add_argument('--address', default="127.0.0.1", help='MQTT address')
@@ -104,8 +117,14 @@ def main():
     args = parser.parse_args()
     
     def on_connect(client, userdata, flags, reason_code, properties):
-        thread = Thread(target = start, args = (client, args))
-        thread.start()
+        global last_message_time
+        
+        last_message_time = time.time()
+        worker1 = Thread(target = start, args = (client, args))
+        worker1.start()
+        
+        worker2 = Thread(target = monitor)
+        worker2.start()
         
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set(args.username, args.password)
