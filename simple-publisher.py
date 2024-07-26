@@ -101,7 +101,7 @@ def publish(client: mqtt.Client, args, urls, iris):
 def monitor():
     while True:
         global last_message_time
-        time.sleep(5)      
+        time.sleep(60)      
         time_last_message = (time.time() - last_message_time)
         if time_last_message > 300:
             print(f"No messages for {time_last_message} seconds. Exiting.")
