@@ -13,6 +13,7 @@ import json
 import argparse
 import logging
 import sys
+import os
 from datetime import datetime, timedelta
 from typing import Set
 import json
@@ -105,7 +106,7 @@ def monitor():
         time_last_message = (time.time() - last_message_time)
         if time_last_message > 300:
             print(f"No messages for {time_last_message} seconds. Exiting.")
-            sys.exit(1)
+            os._exit()
         else:
             print(f"Last message was {time_last_message} seconds ago.")
           
