@@ -129,7 +129,7 @@ def main():
         worker2 = Thread(target = monitor)
         worker2.start()
         
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client(client_id="podping-hive", callback_api_version = mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set(args.username, args.password)
     
     client.on_connect = on_connect 
