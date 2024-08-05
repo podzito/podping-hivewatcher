@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Set
 import json
-import paho.mqtt.client as mqtt
+import pika
 
 import beem
 from beem.account import Account
@@ -55,7 +55,7 @@ def block_num_back_in_minutes(blockchain: Blockchain, m: int) -> int:
     block_num = blockchain.get_estimated_block_num(back_time)
     return block_num
     
-def start(client, args):
+def start(client: pika.BlockingConnection, args):
     try:
         """Outputs URLs as they appear on the Hive Podping stream"""
         allowed_accounts = get_allowed_accounts()
@@ -90,14 +90,14 @@ def start(client, args):
             logging.error(f"Error: {ex}", exc_info=True)
             sys.exit(1)
             
-def publish(client: mqtt.Client, args, urls, iris):
+def publish(client: pika.BlockingConnection, args, urls, iris):
     global last_message_time
     
     print(f"Publishing {urls} {iris}")
     last_message_time = time.time()    
-    response = client.publish(args.topic, json.dumps({"urls": urls, "iris": iris}), 1, retain=True)
-    if response.rc != mqtt.MQTT_ERR_SUCCESS:
-        raise Exception(f"Error publishing message: {response}")
+    channel = client.channel()
+    response = channel.basic_publish(exchange=args.exchange, routing_key=args.key,
+                      body=json.dumps({"urls": urls, "iris": iris}))
 
 def monitor():
     while True:
@@ -109,32 +109,59 @@ def monitor():
             os._exit()
         else:
             print(f"Last message was {time_last_message} seconds ago.")
-          
+
+def declare_exchange(client: pika.BlockingConnection, args):
+    channel = client.channel()
+
+    # Declare a durable exchange
+    channel.exchange_declare(
+        exchange=args.exchange,
+        exchange_type='direct',
+        durable=True
+    )
+
+    # Declare a durable queue
+    channel.queue_declare(
+        queue=args.key,
+        durable=True  # Durable queue
+    )
+
+    # Bind the queue to the exchange with a routing key
+    channel.queue_bind(
+        queue=args.key,
+        exchange=args.exchange,
+        routing_key=args.key
+    )
+              
 def main():
     parser = argparse.ArgumentParser(description='Publish hive messages')
-    parser.add_argument('--address', default="127.0.0.1", help='MQTT address')
-    parser.add_argument('--port', default=1883, help='MQTT port')
-    parser.add_argument('--topic', required=True, help='topic name')
-    parser.add_argument('--username', help='username')
-    parser.add_argument('--password', help='password')
+    parser.add_argument('--host', default="127.0.0.1", help='host')
+    parser.add_argument('--port', default=5672, help='port')
+    parser.add_argument('--exchange', required=True, help='topic exchange')
+    parser.add_argument('--key', required=True, help='topic routing key')
+    parser.add_argument('--username', default = 'rmq_user', help='username')
+    parser.add_argument('--password', default = 'rmq_password', help='password')
     args = parser.parse_args()
     
-    def on_connect(client, userdata, flags, reason_code, properties):
+    def on_connect(channel: pika.BlockingConnection, args):
         global last_message_time
         
-        last_message_time = time.time()
-        worker1 = Thread(target = start, args = (client, args))
-        worker1.start()
+        last_message_time = time.time()        
+        watcher = Thread(target = monitor)
+        watcher.start()
         
-        worker2 = Thread(target = monitor)
-        worker2.start()
+        start(channel, args)
         
-    client = mqtt.Client(client_id="podping-hive", callback_api_version = mqtt.CallbackAPIVersion.VERSION2)
-    client.username_pw_set(args.username, args.password)
+    client =  pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=args.host,
+            port=args.port,
+            virtual_host='/',            
+            credentials=pika.PlainCredentials(args.username, args.password)
+            ))
     
-    client.on_connect = on_connect 
-    client.connect(args.address, args.port)    
-    client.loop_forever()
+    declare_exchange(client, args)
+    on_connect(client, args)    
 
 if __name__ == "__main__":
     try:
