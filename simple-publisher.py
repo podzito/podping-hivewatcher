@@ -97,7 +97,7 @@ def publish(client: pika.BlockingConnection, args, urls, iris):
     last_message_time = time.time()    
     channel = client.channel()
     response = channel.basic_publish(exchange=args.exchange, routing_key=args.key,
-                      body=json.dumps({"urls": urls, "iris": iris}))
+                      body=json.dumps({"urls": urls, "iris": iris, "xurls": []}))
 
 def monitor():
     while True:
