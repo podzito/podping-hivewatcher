@@ -1,0 +1,1 @@
+python3 simple-publisher.py --exchange podzito --key hivewatcher
